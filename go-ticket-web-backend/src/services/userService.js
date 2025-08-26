@@ -1,44 +1,165 @@
 const userRepository = require("../repositories/userRepository");
-
+const {
+    ValidationError,
+    UniqueConstraintError
+} = require('sequelize');
 class UserService {
-    createUser(userData) {
-        // Aqui poderia haver validações de negócio, como verificar se o email já existe
-        if (!userData.name || !userData.email) {
-            throw new Error("Nome e email são obrigatórios.");
+    async createUser(userData) {
+        try {
+            // Validação básica
+            if (!userData.name || !userData.email) {
+                throw new Error("Nome e email são obrigatórios.");
+            }
+            // Verificar se o email já existe
+            const existingUser = await
+            userRepository.findByEmail(userData.email);
+            if (existingUser) {
+                throw new Error("Email já está em uso.");
+            }
+            return await userRepository.create(userData);
+        } catch (error) {
+            // Tratar erros específicos do Sequelize
+            if (error instanceof ValidationError) {
+                const messages = error.errors.map(err =>
+                    err.message);
+                throw new Error(messages.join('. '));
+            }
+            if (error instanceof UniqueConstraintError) {
+                throw new Error("Email já está em uso.");
+            }
+            throw error;
         }
-        return userRepository.create(userData);
     }
 
-    getAllUsers() {
-        return userRepository.findAll();
+    async getAllUsers(options = {}) {
+        try {
+            const {
+                page,
+                limit
+            } = options;
+            if (page && limit) {
+                const offset = (page - 1) * limit;
+                return await userRepository.findAndCountAll({
+                    limit: parseInt(limit),
+                    offset: parseInt(offset)
+                });
+            }
+            return await userRepository.findAll();
+        } catch (error) {
+            throw new Error("Erro ao buscar usuários: " +
+                error.message);
+        }
     }
 
-    getUserById(id) {
-        const user = userRepository.findById(parseInt(id));
-        if (!user) {
-            throw new Error("Usuário não encontrado.");
+    async getUserById(id) {
+        try {
+            // Validar se o ID é um número válido
+            if (!id || isNaN(id)) {
+                throw new Error("ID de usuário inválido.");
+            }
+        } catch (error) {
+            // Tratar erros específicos do Sequelize
+            if (error instanceof ValidationError) {
+                const messages = error.errors.map(err =>
+                    err.message);
+                throw new Error(messages.join('. '));
+            }
+            if (error instanceof UniqueConstraintError) {
+                throw new Error("Email já está em uso.");
+            }
+            throw error;
         }
-        return user;
     }
 
-    updateUser(id, userData) {
-        // Validações de negócio antes de atualizar
-        if (!userData.name && !userData.email) {
-            throw new Error("Pelo menos um campo (nome ou email) deve ser fornecido para atualização.");
+    async getAllUsers(options = {}) {
+        try {
+            const {
+                page,
+                limit
+            } = options;
+            if (page && limit) {
+                const offset = (page - 1) * limit;
+                return await userRepository.findAndCountAll({
+                    limit: parseInt(limit),
+                    offset: parseInt(offset)
+                });
+            }
+            return await userRepository.findAll();
+        } catch (error) {
+            throw new Error("Erro ao buscar usuários: " +
+                error.message);
         }
-        const updatedUser = userRepository.update(parseInt(id), userData);
-        if (!updatedUser) {
-            throw new Error("Usuário não encontrado para atualização.");
-        }
-        return updatedUser;
     }
 
-    deleteUser(id) {
-        const deleted = userRepository.delete(parseInt(id));
-        if (!deleted) {
-            throw new Error("Usuário não encontrado para exclusão.");
+    async getUserById(id) {
+        try {
+            // Validar se o ID é um número válido
+            if (!id || isNaN(id)) {
+                throw new Error("ID de usuário inválido.");
+            }
+            return updatedUser;
+        } catch (error) {
+            // Tratar erros específicos do Sequelize
+            if (error instanceof ValidationError) {
+                const messages = error.errors.map(err =>
+                    err.message);
+                throw new Error(messages.join('. '));
+            }
+            if (error instanceof UniqueConstraintError) {
+                throw new Error("Email já está em uso por outro usuário.");
+            }
+            throw error;
         }
-        return { message: "Usuário deletado com sucesso." };
+    }
+
+    async deleteUser(id) {
+        try {
+            // Validar se o ID é um número válido
+            if (!id || isNaN(id)) {
+                throw new Error("ID de usuário inválido.");
+            }
+            const deleted = await
+            userRepository.delete(parseInt(id));
+            if (!deleted) {
+                throw new Error("Usuário não encontrado para exclusão.");
+            }
+            return {
+                message: "Usuário deletado com sucesso."
+            };
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    async getUsersCount() {
+        try {
+            return await userRepository.count();
+        } catch (error) {
+            throw new Error("Erro ao contar usuários: " +
+                error.message);
+        }
+    }
+
+    async searchUsers(searchTerm, options = {}) {
+        try {
+            if (!searchTerm || searchTerm.trim() === '') {
+                throw new Error("Termo de busca é obrigatório.");
+            }
+            const {
+                page,
+                limit
+            } = options;
+            let searchOptions = {};
+            if (page && limit) {
+                searchOptions.offset = (page - 1) * limit;
+                searchOptions.limit = parseInt(limit);
+            }
+            return await userRepository.search(searchTerm.trim(),
+                searchOptions);
+        } catch (error) {
+            throw new Error("Erro ao buscar usuários: " +
+                error.message);
+        }
     }
 }
 module.exports = new UserService();
